@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using IWshRuntimeLibrary;
 using WindowsShortcutFactory;
 using File = System.IO.File;
 
@@ -45,6 +43,8 @@ namespace TaskSplitter11
 
         private void btnCreate_Click(object sender, EventArgs e)
         {
+            // Check numSeparatorCount
+            CheckNumSeparatorCount();
 
             //Setup & config
             var docsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -52,57 +52,69 @@ namespace TaskSplitter11
             string shortcutsPath = Path.Join(docsPath, "TaskSeparator11", "Shortcuts");
             Directory.CreateDirectory(shortcutsPath);
 
-            //Ensure files are in thwe right place
+            // Retrieve customization settings
+            var separatorCount = (int)numSeparatorCount.Value;
+
+            // Ensure files are in the right place
             EnsureSplitterFilesAreAvailable(appPath, shortcutsPath);
-            
 
-
-            //Make a copy of the Splitter exe
-            string splitterExe = Path.Join(appPath, "Splitter.exe");
-            string splitterExeLocation = GetNewLinkName(shortcutsPath, "exe");
-            File.Copy(splitterExe, splitterExeLocation);
-
-
-            //Create a shortcut to the Splitter exe
-            string linkLocation = GetNewLinkName(shortcutsPath, "lnk");
-
-            //Create shortcut
-            using var shortcut = new WindowsShortcut
+            // Create the shortcuts
+            for (int i = 0; i < separatorCount; i++)
             {
-                Path = splitterExeLocation,
-            };
-            shortcut.Save(linkLocation);
+                // Make a copy of the Splitter exe
+                string splitterExe = Path.Join(appPath, $"Splitter.exe");
+                string splitterExeLocation = GetNewLinkName(shortcutsPath, "exe");
+                File.Copy(splitterExe, splitterExeLocation);
 
+                // Create a shortcut to the Splitter exe
+                string linkLocation = GetNewLinkName(shortcutsPath, "lnk");
 
-            ShellExecute(IntPtr.Zero, "open", linkLocation, "--gui", null, ShowWindowCommands.SW_NORMAL);
+                // Create shortcut
+                using var shortcut = new WindowsShortcut
+                {
+                    Path = splitterExeLocation,
+                };
+                shortcut.Save(linkLocation);
+
+                ShellExecute(IntPtr.Zero, "open", linkLocation, "--gui", null, ShowWindowCommands.SW_NORMAL);
+            }
 
             Application.Exit();
+        }
 
+        private void CheckNumSeparatorCount()
+        {
+            if (numSeparatorCount.Value <= 0 || numSeparatorCount.Value > 10 || numSeparatorCount is null)
+            {
+                MessageBox.Show("Please select a number between 1 and 10.", "Invalid Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
         }
 
         private void EnsureSplitterFilesAreAvailable(string appPath, string shortcutsPath)
         {
-            if (File.Exists(Path.Join(shortcutsPath, "Splitter.dll"))) return;
+            // Check for both Splitter.dll and Splitter.exe in the shortcuts directory
+            bool dllExists = File.Exists(Path.Join(shortcutsPath, "Splitter.dll"));
+            bool exeExists = File.Exists(Path.Join(shortcutsPath, "Splitter.exe"));
+
+            if (dllExists && exeExists) return;
 
             var dir = new DirectoryInfo(appPath);
             var files = dir.GetFiles("Splitter*");
 
-            foreach(var f in files)
+            foreach (var f in files)
             {
                 var source = Path.Join(appPath, f.Name);
                 var dest = Path.Join(shortcutsPath, f.Name);
 
                 File.Copy(source, dest, true);
             }
-
-
-            
         }
 
         private string GetNewLinkName(string path, string ext)
         {
             int count = 1;
-            char c = ext == "exe" ? '_' : ' ';
+            char c = ext == "exe" ? '_' : 'Â ';
 
             string shortcutLink = Path.Join(path, $"{c}.{ext}");
             do
@@ -112,11 +124,6 @@ namespace TaskSplitter11
             } while (File.Exists(shortcutLink));
 
             return shortcutLink;
-        }
-
-        private void label3_Click(object sender, EventArgs e)
-        {
-
         }
     }
 }
